@@ -7,7 +7,7 @@ loglevel = logging.INFO
 httpx_loglevel = logging.WARNING
 logformat = "%(asctime)s [%(levelname)s] %(message)s"
 output_file_prefix = "output/wikitable-z8-stats"
-log_progress_interval = 1000
+log_progress_interval = 500
 
 # For testing: stop after this many functions
-MAX_FUNCTIONS: int = 800
+MAX_FUNCTIONS: int = 5000

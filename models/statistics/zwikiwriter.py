@@ -137,9 +137,9 @@ class ZwikiWriter(BaseModel):
 
             for label, count in test_status_stats.items():
                 percentage = round((count * 100) / total_tests)
-                f.write(f"  {label}: {count} ({percentage}%)%\n")
+                f.write(f"  {label}: {count} ({percentage}%)\n")
 
-            f.write("== Maintenance candidates ==\n")
+            f.write("\n== Maintenance candidates ==\n")
             f.write("Deletion candidates (no implementations, no tests):\n")
 
             if deletion_candidates:

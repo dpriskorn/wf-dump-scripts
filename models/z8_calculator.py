@@ -284,9 +284,13 @@ class Z8Calculator(BaseModel):
         output_file_1 = self.output_file_prefix + "-1-9999.txt"
         self._write_zids_file(output_file_1, min_zid=1, max_zid=9999)
 
-        # File for ZID>=10000
-        output_file_2 = self.output_file_prefix + "-10000+.txt"
-        self._write_zids_file(output_file_2, min_zid=10000)
+        # File for Z10000-19999
+        output_file_2 = self.output_file_prefix + "-10000-19999.txt"
+        self._write_zids_file(output_file_2, min_zid=10000, max_zid=19999)
+
+        # File for ZID>=20000
+        output_file_3 = self.output_file_prefix + "-20000+.txt"
+        self._write_zids_file(output_file_3, min_zid=20000)
 
     def _write_zids_file(
         self, filename: str, min_zid: int = 1, max_zid: int = None

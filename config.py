@@ -8,4 +8,4 @@ httpx_loglevel = logging.WARNING
 logformat = "%(asctime)s [%(levelname)s] %(message)s"
 
 # For testing: stop after this many functions
-MAX_FUNCTIONS: int = 10
+MAX_FUNCTIONS: int = 25

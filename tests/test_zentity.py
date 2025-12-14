@@ -26,8 +26,8 @@ class TestZentity(TestCase):
 
     def test_count_aliases(self):
         entity = Zentity(data=self.sample_data)
-        assert entity.count_aliases() >= 0
+        assert entity.count_aliases >= 0
 
     def test_count_languages(self):
         entity = Zentity(data=self.sample_data)
-        assert entity.count_languages() >= 0
+        assert entity.count_languages >= 0

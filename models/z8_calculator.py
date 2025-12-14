@@ -1,13 +1,12 @@
 # ./models/z8_calculator.py
 import re
 from datetime import datetime
-
-from pydantic import BaseModel
 from typing import List, Dict, Union
 import json
 import os
 import logging
 
+from pydantic import BaseModel
 from models.exceptions import DateError
 from models.wf.client import Client
 from models.wf.zfunction import Zfunction
@@ -22,17 +21,20 @@ class Z8Calculator(BaseModel):
     output_file: str = "output/wikitable-z8-stats.txt"
     progress_interval: int = 1000
 
+    # --- Attributes to hold intermediate data ---
+    tester_map: Dict[str, Ztester] = {}
+    zfunctions: List[Zfunction] = []
+    table: List[Dict[str, Union[str, int]]] = []
+    last_update: str = ""
+
     class Config:
         arbitrary_types_allowed = True
 
-    def build_tester_map(self) -> Dict[str, Ztester]:
-        """
-        Iterate once over the JSONL file and instantiate all Ztester objects.
-        Returns a dict: {ZID -> Ztester}
-        """
-        tester_map: Dict[str, Ztester] = {}
-        logging.info(f"Building tester map from {self.jsonl_file}...")
+    def build_tester_map(self) -> None:
+        """Populate self.tester_map with ZID -> Ztester objects."""
+        self.tester_map = {}
         processed = 0
+        logging.info(f"Building tester map from {self.jsonl_file}...")
 
         with open(self.jsonl_file, "r", encoding="utf-8") as f:
             for line in f:
@@ -46,22 +48,18 @@ class Z8Calculator(BaseModel):
                     continue
 
                 zid = obj.get("Z1K1")
-                if not zid:
-                    continue
+                if zid and zid.startswith("Z") and zid not in self.tester_map:
+                    self.tester_map[zid] = Ztester(data=obj)
 
-                # Only include testers (Z13 type) or whatever your logic requires
-                if zid not in tester_map and zid.startswith("Z"):
-                    tester_map[zid] = Ztester(data=obj)
+        logging.info(f"Tester map built with {len(self.tester_map)} entries.")
 
-        logging.info(f"Tester map built with {len(tester_map)} entries.")
-        return tester_map
-
-    async def calculate(self):
-        zfunctions: List[Zfunction] = []
+    async def calculate(self) -> None:
+        """Compute ZFunctions and connected implementations; populate self.zfunctions and self.table."""
+        self.zfunctions = []
         zid_count = 0
 
-        # First, build tester map once
-        tester_map = self.build_tester_map()
+        # Build tester map
+        self.build_tester_map()
 
         logging.info(f"Processing functions from {self.jsonl_file}...")
         processed = 0
@@ -82,59 +80,73 @@ class Z8Calculator(BaseModel):
                 func = Zfunction(data=obj)
                 if func.is_function:
                     func.populate()
-                    func.extract_testers(tester_map)  # attach testers from map
-                    zfunctions.append(func)
+                    func.extract_testers(self.tester_map)
+                    self.zfunctions.append(func)
                     zid_count += 1
 
-                    # --- Stop after MAX_FUNCTIONS for testing ---
                     if zid_count >= config.MAX_FUNCTIONS:
                         logging.info(
-                            f"Reached MAX_FUNCTIONS={config.MAX_FUNCTIONS}, stopping early for testing."
+                            f"Reached MAX_FUNCTIONS={config.MAX_FUNCTIONS}, stopping early."
                         )
                         break
 
         logging.info(f"Collected {zid_count} ZFunctions.")
 
-        # Fetch connected implementations using async context manager
+        # Fetch connected implementations
         async with Client(concurrency=8) as client:
             zid_map = await client.bulk_fetch_connected_implementations(
-                item.zid for item in zfunctions
+                item.zid for item in self.zfunctions
             )
 
-        for zfunction in zfunctions:
+        for zfunction in self.zfunctions:
             zfunction.apply_connected_implementations(zid_map.get(zfunction.zid, []))
 
-        # Build wikitext table
-        table: List[Dict[str, Union[str, int]]] = []
-        for zfunction in zfunctions:
-            table.append(
-                {
-                    "FunctionID": zfunction.zid,
-                    "Aliases": zfunction.count_aliases,
-                    "Implementations": zfunction.number_of_connected_implementations,
-                    "Tests": zfunction.count_testers,
-                    "Languages": zfunction.count_languages,
-                }
-            )
-        # --- extract date from filename ---
+        # Build table
+        self.table = [
+            {
+                "FunctionID": z.zid,
+                "Aliases": z.count_aliases,
+                "Implementations": z.number_of_connected_implementations,
+                "Tests": z.count_testers,
+                "Languages": z.count_languages,
+            }
+            for z in self.zfunctions
+        ]
+
+        # Extract date from filename
         basename = os.path.basename(self.jsonl_file)
-        match = re.search(r'(\d{8})', basename)
+        match = re.search(r"(\d{8})", basename)
         if match:
             date_str = match.group(1)
             try:
-                last_update = datetime.strptime(date_str, "%Y%m%d").strftime("%Y-%m-%d")
+                self.last_update = datetime.strptime(date_str, "%Y%m%d").strftime(
+                    "%Y-%m-%d"
+                )
             except ValueError:
                 raise DateError()
         else:
             raise DateError()
 
-        os.makedirs(os.path.dirname(self.output_file), exist_ok=True)
-        with open(self.output_file, "w", encoding="utf-8") as f:
+    def write_wikitext(self) -> None:
+        """Wrapper: write two separate wikitext files based on ZID ranges."""
+        # File for ZID1-9999
+        output_file_1 = os.path.splitext(self.output_file)[0] + "-1-9999.txt"
+        self._write_zids_file(output_file_1, min_zid=1, max_zid=9999)
+
+        # File for ZID>=10000
+        output_file_2 = os.path.splitext(self.output_file)[0] + "-10000+.txt"
+        self._write_zids_file(output_file_2, min_zid=10000)
+
+    def _write_zids_file(self, filename: str, min_zid: int = 1, max_zid: int = None) -> None:
+        """Write a wikitext table for a given ZID range to a specific file."""
+        os.makedirs(os.path.dirname(filename), exist_ok=True)
+        with open(filename, "w", encoding="utf-8") as f:
+            # Write header
             f.write(
-                '; Note: Disconnected tests/implementations are not in presently in the dump\n'
-                f'; Last update: {last_update}\n'
+                '; Note: Disconnected tests/implementations are not in presently in the dump\n\n'
+                f'Last update: {self.last_update}\n'
                 '{| class="wikitable sortable"\n'
-                "! rowspan='2' | FunctionID \n"
+                "! rowspan='2' | Function \n"
                 "! rowspan='2' | Aliases \n"
                 "! colspan='2' | Connected \n"
                 "! rowspan='2' | Translations\n"
@@ -142,11 +154,24 @@ class Z8Calculator(BaseModel):
                 "! Implementations \n"
                 "! Tests\n"
             )
-            for row in table:
+
+            # Write rows in the given range
+            for row in self.table:
+                try:
+                    zid_number = int(re.sub(r"^Z", "", row["FunctionID"]))
+                except ValueError:
+                    continue
+
+                if (min_zid is not None and zid_number < min_zid) or (
+                    max_zid is not None and zid_number > max_zid
+                ):
+                    continue
+
                 f.write(
                     f"|-\n| [[{row['FunctionID']}]] || {row['Aliases']} || "
                     f"{row['Implementations']} || {row['Tests']} || {row['Languages']}\n"
                 )
+
             f.write("|}\n")
 
-        logging.info(f"Wikitext table written to {self.output_file}")
+        logging.info(f"Wikitext table written to {filename}")

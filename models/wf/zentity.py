@@ -39,6 +39,7 @@ class Zentity(BaseModel):
 
     # ---------- Generic recursive helpers ----------
 
+    @property
     def count_aliases(self) -> int:
         """
         Recursively count all dicts containing "Z1K1" anywhere in the data.
@@ -55,6 +56,7 @@ class Zentity(BaseModel):
 
         return _count(self.data)
 
+    @property
     def count_languages(self) -> int:
         """
         Recursively count all language entries, i.e. dicts under "Z12K1" that contain "Z11K2".

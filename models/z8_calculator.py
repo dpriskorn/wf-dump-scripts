@@ -1,10 +1,14 @@
 # ./models/z8_calculator.py
+import re
+from datetime import datetime
+
 from pydantic import BaseModel
 from typing import List, Dict, Union
 import json
 import os
 import logging
 
+from models.exceptions import DateError
 from models.wf.client import Client
 from models.wf.zfunction import Zfunction
 from models.wf.ztester import Ztester
@@ -107,24 +111,41 @@ class Z8Calculator(BaseModel):
                 {
                     "FunctionID": zfunction.zid,
                     "Aliases": zfunction.count_aliases,
-                    "Implementations": "? (not in the dump)",
-                    "Connected": zfunction.number_of_connected_implementations,
-                    "Disconnected": "? (not in the dump)",
+                    "Implementations": zfunction.number_of_connected_implementations,
                     "Tests": zfunction.count_testers,
                     "Languages": zfunction.count_languages,
                 }
             )
+        # --- extract date from filename ---
+        basename = os.path.basename(self.jsonl_file)
+        match = re.search(r'(\d{8})', basename)
+        if match:
+            date_str = match.group(1)
+            try:
+                last_update = datetime.strptime(date_str, "%Y%m%d").strftime("%Y-%m-%d")
+            except ValueError:
+                raise DateError()
+        else:
+            raise DateError()
 
         os.makedirs(os.path.dirname(self.output_file), exist_ok=True)
         with open(self.output_file, "w", encoding="utf-8") as f:
-            f.write('{| class="wikitable sortable"\n')
             f.write(
-                "! FunctionID !! Aliases !! Implementations !! Connected impl !! Disconnected impl !! Tests !! Translations\n"
+                '; Note: Disconnected tests/implementations are not in presently in the dump\n'
+                f'; Last update: {last_update}\n'
+                '{| class="wikitable sortable"\n'
+                "! rowspan='2' | FunctionID \n"
+                "! rowspan='2' | Aliases \n"
+                "! colspan='2' | Connected \n"
+                "! rowspan='2' | Translations\n"
+                "|-\n"
+                "! Implementations \n"
+                "! Tests\n"
             )
             for row in table:
                 f.write(
-                    f"|-\n| [[{row['FunctionID']}]] || {row['Aliases']} || {row['Implementations']} || "
-                    f"{row['Connected']} || {row['Disconnected']} || {row['Tests']} || {row['Languages']}\n"
+                    f"|-\n| [[{row['FunctionID']}]] || {row['Aliases']} || "
+                    f"{row['Implementations']} || {row['Tests']} || {row['Languages']}\n"
                 )
             f.write("|}\n")
 

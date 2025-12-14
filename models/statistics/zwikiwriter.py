@@ -91,27 +91,32 @@ class ZwikiWriter(BaseModel):
         over_50_percent_fail = sum(
             1 for f, total in fail_counts if total > 0 and f / total >= 0.5
         )
+        _100_percent_fail = sum(
+            1 for f, total in fail_counts if total > 0 and f / total == 1
+        )
 
-        deletion_candidates_percent = round(len(deletion_candidates)*100 / num_functions)
+        deletion_candidates_percent = round((len(deletion_candidates)*100) / num_functions)
 
         output_file = "summary.txt"
         with open(f"{output_file_prefix}-{output_file}", "w", encoding="utf-8") as f:
-            f.write(f"== Z8 Summary =="
+            f.write(f"== Z8 Summary ==\n"
                     f"(last update: {self.last_update})\n\n")
 
             f.write(f"  Number of functions processed: {num_functions}\n")
             f.write(
-                f"Mean number of implementations per function: "
+                f"  Mean number of implementations per function: "
                 f"{mean_implementations:.2f}\n"
             )
-            f.write(f"  Mean number of tests per function: {mean_tests:.2f}\n\n")
+            f.write(f"  Mean number of tests per function: {mean_tests:.2f}\n")
+            f.write(f"  Deletion candidates: {len(deletion_candidates)} ({deletion_candidates_percent}%)\n")
 
-            f.write("=== Functions by failed tests count ===\n")
+            f.write("\n=== Functions by failed tests count ===\n")
             f.write(f"  0 failed tests: {zero_fail}\n")
             f.write(f"  1 failed test:  {one_fail}\n")
             f.write(f"  2 failed tests: {two_fail}\n")
             f.write(f"  2+ failed tests: {two_or_more_fail}\n")
-            f.write(f"  >50% failed tests: {over_50_percent_fail}\n\n")
+            f.write(f"  >50% failed tests: {over_50_percent_fail}\n")
+            f.write(f"  100% failed tests: {_100_percent_fail}\n\n")
 
             f.write("=== Total tests by status ===\n")
             f.write(f"  Pass:  {total_pass}\n")
@@ -119,7 +124,6 @@ class ZwikiWriter(BaseModel):
 
             f.write("== Maintenance candidates ==\n")
             f.write("Deletion candidates (no implementations, no tests):\n")
-            f.write(f"\nTotal deletion candidates: {len(deletion_candidates)} ({deletion_candidates_percent})\n")
 
             if deletion_candidates:
                 for zid in deletion_candidates:

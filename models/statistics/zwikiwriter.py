@@ -95,12 +95,13 @@ class ZwikiWriter(BaseModel):
             1 for f, total in fail_counts if total > 0 and f / total == 1
         )
 
-        deletion_candidates_percent = round((len(deletion_candidates)*100) / num_functions)
+        deletion_candidates_percent = round(
+            (len(deletion_candidates) * 100) / num_functions
+        )
 
         output_file = "summary.txt"
         with open(f"{output_file_prefix}-{output_file}", "w", encoding="utf-8") as f:
-            f.write(f"== Z8 Summary ==\n"
-                    f"(last update: {self.last_update})\n\n")
+            f.write(f"== Z8 Summary ==\n" f"(last update: {self.last_update})\n\n")
 
             f.write(f"  Number of functions processed: {num_functions}\n")
             f.write(
@@ -108,19 +109,35 @@ class ZwikiWriter(BaseModel):
                 f"{mean_implementations:.2f}\n"
             )
             f.write(f"  Mean number of tests per function: {mean_tests:.2f}\n")
-            f.write(f"  Deletion candidates: {len(deletion_candidates)} ({deletion_candidates_percent}%)\n")
+            f.write(
+                f"  Deletion candidates: {len(deletion_candidates)} ({deletion_candidates_percent}%)\n"
+            )
 
             f.write("\n=== Functions by failed tests count ===\n")
-            f.write(f"  0 failed tests: {zero_fail}\n")
-            f.write(f"  1 failed test:  {one_fail}\n")
-            f.write(f"  2 failed tests: {two_fail}\n")
-            f.write(f"  2+ failed tests: {two_or_more_fail}\n")
-            f.write(f"  >50% failed tests: {over_50_percent_fail}\n")
-            f.write(f"  100% failed tests: {_100_percent_fail}\n\n")
 
-            f.write("=== Total tests by status ===\n")
-            f.write(f"  Pass:  {total_pass}\n")
-            f.write(f"  Fail:  {total_fail}\n")
+            failed_test_stats = {
+                "0 failed tests": zero_fail,
+                "1 failed test": one_fail,
+                "2 failed tests": two_fail,
+                "2+ failed tests": two_or_more_fail,
+                ">50% failed tests": over_50_percent_fail,
+                "100% failed tests": _100_percent_fail,
+            }
+
+            for label, count in failed_test_stats.items():
+                percentage = round((count * 100) / num_functions)
+                f.write(f"  {label}: {count} ({percentage}%)\n")
+
+            f.write("\n=== Total tests by status ===\n")
+
+            test_status_stats = {
+                "Pass": total_pass,
+                "Fail": total_fail,
+            }
+
+            for label, count in test_status_stats.items():
+                percentage = round((count * 100) / total_tests)
+                f.write(f"  {label}: {count} ({percentage}%)%\n")
 
             f.write("== Maintenance candidates ==\n")
             f.write("Deletion candidates (no implementations, no tests):\n")
@@ -162,15 +179,10 @@ class ZwikiWriter(BaseModel):
             ):
                 continue
 
-            pass_count, fail_count, total_tests = self._count_test_status(
-                zf
-            )
+            pass_count, fail_count, total_tests = self._count_test_status(zf)
 
             # Determine health status
-            if (
-                fail_count == 0
-                and zf.number_of_implementations > 0
-            ):
+            if fail_count == 0 and zf.number_of_implementations > 0:
                 health = "✅"
             else:
                 health = "❌"

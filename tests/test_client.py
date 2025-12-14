@@ -130,7 +130,7 @@ class TestClient:
         assert results == {example_tester.zid: TestStatus.PASS}
 
     async def test_fetch_impl_test_statuses_error(
-            self, client, example_impl, example_tester
+        self, client, example_impl, example_tester
     ):
         client.fetch_test_status = AsyncMock(side_effect=NoTestResultFound())
 

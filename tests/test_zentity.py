@@ -8,7 +8,7 @@ from models.wf.zentity import Zentity
 
 class TestZentity(TestCase):
     def setUp(self):
-        test_file = Path("test_data/zfunction.json")
+        test_file = Path("test_data/dump/zfunction.json")
         with test_file.open("r", encoding="utf-8") as f:
             self.sample_data = json.load(f)
 

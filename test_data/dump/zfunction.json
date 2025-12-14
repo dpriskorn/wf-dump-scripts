@@ -1,0 +1,99 @@
+{
+  "Z1K1": "Z2",
+  "Z2K1": { "Z1K1": "Z6", "Z6K1": "Z27327" },
+  "Z2K2": {
+    "Z1K1": "Z8",
+    "Z8K1": [
+      "Z17",
+      {
+        "Z1K1": "Z17",
+        "Z17K1": "Z6091",
+        "Z17K2": "Z27327K1",
+        "Z17K3": {
+          "Z1K1": "Z12",
+          "Z12K1": [
+            "Z11",
+            { "Z1K1": "Z11", "Z11K1": "Z1787", "Z11K2": "elemento Wikidata" },
+            { "Z1K1": "Z11", "Z11K1": "Z1002", "Z11K2": "item" },
+            { "Z1K1": "Z11", "Z11K1": "Z1830", "Z11K2": "項目" }
+          ]
+        }
+      },
+      {
+        "Z1K1": "Z17",
+        "Z17K1": "Z6092",
+        "Z17K2": "Z27327K2",
+        "Z17K3": {
+          "Z1K1": "Z12",
+          "Z12K1": [
+            "Z11",
+            { "Z1K1": "Z11", "Z11K1": "Z1787", "Z11K2": "predicato" },
+            { "Z1K1": "Z11", "Z11K1": "Z1002", "Z11K2": "predicate" },
+            { "Z1K1": "Z11", "Z11K1": "Z1830", "Z11K2": "述語" }
+          ]
+        }
+      },
+      {
+        "Z1K1": "Z17",
+        "Z17K1": "Z60",
+        "Z17K2": "Z27327K3",
+        "Z17K3": {
+          "Z1K1": "Z12",
+          "Z12K1": [
+            "Z11",
+            { "Z1K1": "Z11", "Z11K1": "Z1787", "Z11K2": "lingua" },
+            { "Z1K1": "Z11", "Z11K1": "Z1002", "Z11K2": "language" },
+            { "Z1K1": "Z11", "Z11K1": "Z1830", "Z11K2": "言語" }
+          ]
+        }
+      }
+    ],
+    "Z8K2": "Z6005",
+    "Z8K3": ["Z20", "Z27328", "Z27329", "Z27331", "Z27891"],
+    "Z8K4": ["Z14", "Z27335"],
+    "Z8K5": "Z27327"
+  },
+  "Z2K3": {
+    "Z1K1": "Z12",
+    "Z12K1": [
+      "Z11",
+      {
+        "Z1K1": "Z11",
+        "Z11K1": "Z1787",
+        "Z11K2": "miglior lessema per elemento Wikidata"
+      },
+      {
+        "Z1K1": "Z11",
+        "Z11K1": "Z1002",
+        "Z11K2": "best lexeme for Wikidata item"
+      },
+      {
+        "Z1K1": "Z11",
+        "Z11K1": "Z1830",
+        "Z11K2": "ウィキデータ項目に対するベストな語彙素"
+      }
+    ]
+  },
+  "Z2K4": { "Z1K1": "Z32", "Z32K1": ["Z31"] },
+  "Z2K5": {
+    "Z1K1": "Z12",
+    "Z12K1": [
+      "Z11",
+      {
+        "Z1K1": "Z11",
+        "Z11K1": "Z1787",
+        "Z11K2": "Restituisce il lessema che rappresenta l'elemento Wikidata (collegato tramite il predicato selezionato) che è più adatto per Wikipedia astratta"
+      },
+      {
+        "Z1K1": "Z11",
+        "Z11K1": "Z1002",
+        "Z11K2": "Return the lexeme connected to the given item through the given predicate that is more suitable for Abstract Wikipedia."
+      },
+      {
+        "Z1K1": "Z11",
+        "Z11K1": "Z1830",
+        "Z11K2": "与えられた述語を介して、与えられた項目に接続されている語彙素のうち、抽象ウィキペディアにより適したものを返す。"
+      }
+    ]
+  }
+}

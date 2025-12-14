@@ -7,7 +7,7 @@ from pathlib import Path
 
 class TestZimpl(TestCase):
     def setUp(self):
-        test_file = Path("test_data/zimplementation.json")
+        test_file = Path("test_data/dump/zimplementation.json")
         with test_file.open("r", encoding="utf-8") as f:
             self.data = json.load(f)
 

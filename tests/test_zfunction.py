@@ -10,7 +10,7 @@ from models.wf.zimpl import Zimpl
 class TestZfunction(TestCase):
     def setUp(self):
         # Load sample Zfunction JSON
-        zfunc_file = Path("test_data/zfunction.json")
+        zfunc_file = Path("test_data/dump/zfunction.json")
         with zfunc_file.open("r", encoding="utf-8") as f:
             self.zfunction_data = json.load(f)
 

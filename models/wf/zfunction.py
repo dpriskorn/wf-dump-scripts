@@ -1,8 +1,8 @@
 # ./models/wf/zfunction.py
-from typing import List, Dict
 import logging
+from typing import List, Dict
+
 from pydantic import Field
-from flatten_json import flatten
 
 from models.wf.zentity import Zentity
 from models.wf.zimpl import Zimpl
@@ -38,7 +38,7 @@ class Zfunction(Zentity):
         return len(self.ztesters)
 
     # ---------- Population ----------
-    def extract_ztesters(self, map: Dict[str, Ztester]) -> None:
+    def extract_ztesters(self, map_: Dict[str, Ztester]) -> None:
         """
         Populate self.ztesters by looking up ZIDs in Z2K2 > Z8K3.
         """
@@ -55,11 +55,11 @@ class Zfunction(Zentity):
             z8k3 = [z8k3]
 
         for zid in z8k3:
-            tester = map.get(zid)
+            tester = map_.get(zid)
             if tester:
                 self.ztesters.append(tester)
 
-    def extract_zimpl(self, map: Dict[str, Zimpl]) -> None:
+    def extract_zimpl(self, map_: Dict[str, Zimpl]) -> None:
         """
         Populate self.zimpl by looking up ZIDs in Z2K2 > Z8K4.
         See https://www.wikifunctions.org/view/en/Z8
@@ -77,7 +77,7 @@ class Zfunction(Zentity):
             z8k4 = [z8k4]
 
         for zid in z8k4:
-            zimpl = map.get(zid)
+            zimpl = map_.get(zid)
             if zimpl:
                 self.zimpl.append(zimpl)
 

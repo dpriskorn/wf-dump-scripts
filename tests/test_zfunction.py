@@ -17,14 +17,24 @@ class TestZfunction(TestCase):
         # Mock maps with keys matching Z8K3 and Z8K4
         self.impl_map = {
             "Z14": Zimpl(data={"Z1K1": "Z2", "Z2K1": {"Z1K1": "Z6", "Z6K1": "Z14"}}),
-            "Z27335": Zimpl(data={"Z1K1": "Z2", "Z2K1": {"Z1K1": "Z6", "Z6K1": "Z27335"}}),
+            "Z27335": Zimpl(
+                data={"Z1K1": "Z2", "Z2K1": {"Z1K1": "Z6", "Z6K1": "Z27335"}}
+            ),
         }
         self.tester_map = {
             "Z20": Ztester(data={"Z1K1": "Z2", "Z2K1": {"Z1K1": "Z6", "Z6K1": "Z20"}}),
-            "Z27328": Ztester(data={"Z1K1": "Z2", "Z2K1": {"Z1K1": "Z6", "Z6K1": "Z27328"}}),
-            "Z27329": Ztester(data={"Z1K1": "Z2", "Z2K1": {"Z1K1": "Z6", "Z6K1": "Z27329"}}),
-            "Z27331": Ztester(data={"Z1K1": "Z2", "Z2K1": {"Z1K1": "Z6", "Z6K1": "Z27331"}}),
-            "Z27891": Ztester(data={"Z1K1": "Z2", "Z2K1": {"Z1K1": "Z6", "Z6K1": "Z27891"}}),
+            "Z27328": Ztester(
+                data={"Z1K1": "Z2", "Z2K1": {"Z1K1": "Z6", "Z6K1": "Z27328"}}
+            ),
+            "Z27329": Ztester(
+                data={"Z1K1": "Z2", "Z2K1": {"Z1K1": "Z6", "Z6K1": "Z27329"}}
+            ),
+            "Z27331": Ztester(
+                data={"Z1K1": "Z2", "Z2K1": {"Z1K1": "Z6", "Z6K1": "Z27331"}}
+            ),
+            "Z27891": Ztester(
+                data={"Z1K1": "Z2", "Z2K1": {"Z1K1": "Z6", "Z6K1": "Z27891"}}
+            ),
         }
 
     def test_is_function_true(self):

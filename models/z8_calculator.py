@@ -51,11 +51,11 @@ class Z8Calculator(BaseModel):
         arbitrary_types_allowed = True
 
     def build_map(
-            self,
-            cls: type,
-            target_map: Dict[str, BaseModel],
-            check_attr: str,
-            description: str
+        self,
+        cls: type,
+        target_map: Dict[str, BaseModel],
+        check_attr: str,
+        description: str,
     ) -> None:
         """
         Generic method to populate a map with ZID -> object of type cls.
@@ -102,7 +102,7 @@ class Z8Calculator(BaseModel):
         zid_count = 0
 
         # Build maps
-        self.build_tester_map()
+        self.build_ztester_map()
         self.build_zimpl_map()
 
         logging.info(f"Processing functions from {self.jsonl_file}...")
@@ -125,7 +125,7 @@ class Z8Calculator(BaseModel):
                 if func.is_function:
                     func.populate()
                     func.extract_ztesters(self.ztester_map)
-                    func.extract_zimpl(self.ztester_map)
+                    func.extract_zimpl(self.zimpl_map)
                     self.zfunctions.append(func)
                     zid_count += 1
 

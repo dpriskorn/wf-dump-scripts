@@ -13,7 +13,7 @@ class TestZimpl(TestCase):
 
     def test_is_implementation_true(self):
         impl = Zimpl(data={"Z1K1": "Z14"})
-        assert impl.is_implementation() is True
+        assert impl.is_implementation is True
 
     def test_extract_connected(self):
         impl = Zimpl(data=self.data)

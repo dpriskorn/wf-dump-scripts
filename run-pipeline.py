@@ -1,5 +1,6 @@
 # ./run-pipeline.py
 import logging
+import time
 import config
 from pydantic import BaseModel
 from models.dump_converter import DumpConverter
@@ -35,10 +36,16 @@ class Pipeline(BaseModel):
             logging.info(f"Processing JSONL file: {jsonl_file}")
             self.calculator = Z8Calculator(jsonl_file=jsonl_file)
             await self.calculator.calculate()
+            self.calculator.write_wikitext()
 
 
 if __name__ == "__main__":
     import asyncio
 
+    start_time = time.time()
     pipeline = Pipeline()
     asyncio.run(pipeline.run_pipeline())
+    end_time = time.time()
+
+    elapsed = end_time - start_time
+    logging.info(f"Total pipeline run time: {elapsed:.2f} seconds")

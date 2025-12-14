@@ -20,5 +20,6 @@ class Zimpl(Zentity):
         # Typed list: ["Z14", impl1, impl2, ...]
         return impls[1:]
 
+    @property
     def is_implementation(self) -> bool:
         return isinstance(self.data, dict) and self.data.get("Z1K1") == "Z14"

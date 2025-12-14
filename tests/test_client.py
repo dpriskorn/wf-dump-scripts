@@ -1,17 +1,15 @@
 import json
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 import pytest_asyncio
-from unittest.mock import AsyncMock, MagicMock
 
-from httpx import HTTPError
-
+from models.exceptions import NoTestResultFound
 from models.wf.client import Client
 from models.wf.enums import TestStatus
 from models.wf.zfunction import Zfunction
 from models.wf.zimpl import Zimpl
 from models.wf.ztester import Ztester
-from models.exceptions import NoTestResultFound
 
 
 # ----------------------
@@ -132,13 +130,14 @@ class TestClient:
         assert results == {example_tester.zid: TestStatus.PASS}
 
     async def test_fetch_impl_test_statuses_error(
-        self, client, example_impl, example_tester
+            self, client, example_impl, example_tester
     ):
-        client.fetch_test_status = AsyncMock(side_effect=HTTPError("fail"))
-        results = await client.fetch_impl_test_statuses(
-            "Zfunc", example_impl, [example_tester]
-        )
-        assert results == {example_tester.zid: TestStatus.ERROR}
+        client.fetch_test_status = AsyncMock(side_effect=NoTestResultFound())
+
+        with pytest.raises(NoTestResultFound):
+            await client.fetch_impl_test_statuses(
+                "Zfunc", example_impl, [example_tester]
+            )
 
     # ----------------------
     # fetch_function_test_status_map()

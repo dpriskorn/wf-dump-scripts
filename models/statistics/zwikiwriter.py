@@ -4,7 +4,7 @@ import re
 from datetime import datetime
 from typing import List
 
-from pydantic import Field
+from pydantic import Field, BaseModel
 
 from config import output_file_prefix
 from models.exceptions import DateError
@@ -14,16 +14,17 @@ from models.wf.zfunction import Zfunction
 logger = logging.getLogger(__name__)
 
 
-class ZwikiWriter:
+class ZwikiWriter(BaseModel):
     """Writes wikitext tables and summary statistics."""
+
     jsonl_file: str = Field(
         ..., description="Path to the input JSONL file (only one file at a time)."
     )
-    last_update: str = Field(default="", description="Timestamp of the last update.")
     zfunctions: List[Zfunction] = Field(
         ...,
         description="List of ZFunction objects collected from the input file.",
     )
+    last_update: str = Field(default="", description="Timestamp of the last update.")
 
     def extract_date(self):
         # Extract date from filename
@@ -40,8 +41,8 @@ class ZwikiWriter:
         else:
             raise DateError()
 
-
     def write_wikitext(self):
+        self.extract_date()
         self._write_zids_file(f"{output_file_prefix}-1-9999.txt", 1, 9999)
         self._write_zids_file(f"{output_file_prefix}-10000-19999.txt", 10000, 19999)
         self._write_zids_file(f"{output_file_prefix}-20000+.txt", 20000)
@@ -54,26 +55,34 @@ class ZwikiWriter:
             self._write_table_rows(f, min_zid, max_zid)
             self._write_table_footer(f)
 
-    # Keep your _write_table_header/_write_table_rows/_write_table_footer
-    # and _count_test_status methods here as they were
-
     def write_summary_statistics(self) -> None:
         """Compute summary statistics for all ZFunctions and write to a file."""
         total_implementations = 0
+        total_tests = 0
         num_functions = len(self.zfunctions)
         fail_counts = []
 
-        total_pass = total_fail = total_error = 0
+        total_pass = total_fail = 0
+        deletion_candidates: list[str] = []
 
         for zf in self.zfunctions:
             total_implementations += zf.number_of_implementations
-            pass_count, fail_count, error_count, total_tests = self._count_test_status(zf)
-            fail_counts.append((fail_count, total_tests))
+
+            pass_count, fail_count, zf_total_tests = self._count_test_status(zf)
+            fail_counts.append((fail_count, zf_total_tests))
+
             total_pass += pass_count
             total_fail += fail_count
-            total_error += error_count
+            total_tests += zf_total_tests
 
-        mean_implementations = total_implementations / num_functions if num_functions else 0
+            # Deletion candidate: no implementations, no tests
+            if zf.number_of_implementations == 0 and zf_total_tests == 0:
+                deletion_candidates.append(zf.zid)
+
+        mean_implementations = (
+            total_implementations / num_functions if num_functions else 0
+        )
+        mean_tests = total_tests / num_functions if num_functions else 0
 
         zero_fail = sum(1 for f, _ in fail_counts if f == 0)
         one_fail = sum(1 for f, _ in fail_counts if f == 1)
@@ -83,21 +92,40 @@ class ZwikiWriter:
             1 for f, total in fail_counts if total > 0 and f / total >= 0.5
         )
 
-        output_file = "z8-statistics.txt"
-        with open(output_file, "w", encoding="utf-8") as f:
-            f.write(f"Z8 Summary Statistics (last update: {self.last_update})\n\n")
-            f.write(f"Number of functions processed: {num_functions}\n")
-            f.write(f"Mean number of implementations per function: {mean_implementations:.2f}\n\n")
-            f.write("Total tests by status:\n")
-            f.write(f"  Pass:  {total_pass}\n")
-            f.write(f"  Fail:  {total_fail}\n")
-            f.write(f"  Error: {total_error}\n\n")
-            f.write("Functions by failed tests count:\n")
+        deletion_candidates_percent = round(len(deletion_candidates)*100 / num_functions)
+
+        output_file = "summary.txt"
+        with open(f"{output_file_prefix}-{output_file}", "w", encoding="utf-8") as f:
+            f.write(f"== Z8 Summary =="
+                    f"(last update: {self.last_update})\n\n")
+
+            f.write(f"  Number of functions processed: {num_functions}\n")
+            f.write(
+                f"Mean number of implementations per function: "
+                f"{mean_implementations:.2f}\n"
+            )
+            f.write(f"  Mean number of tests per function: {mean_tests:.2f}\n\n")
+
+            f.write("=== Functions by failed tests count ===\n")
             f.write(f"  0 failed tests: {zero_fail}\n")
             f.write(f"  1 failed test:  {one_fail}\n")
             f.write(f"  2 failed tests: {two_fail}\n")
             f.write(f"  2+ failed tests: {two_or_more_fail}\n")
-            f.write(f"Functions with >50% failed tests: {over_50_percent_fail}\n")
+            f.write(f"  >50% failed tests: {over_50_percent_fail}\n\n")
+
+            f.write("=== Total tests by status ===\n")
+            f.write(f"  Pass:  {total_pass}\n")
+            f.write(f"  Fail:  {total_fail}\n")
+
+            f.write("== Maintenance candidates ==\n")
+            f.write("Deletion candidates (no implementations, no tests):\n")
+            f.write(f"\nTotal deletion candidates: {len(deletion_candidates)} ({deletion_candidates_percent})\n")
+
+            if deletion_candidates:
+                for zid in deletion_candidates:
+                    f.write(f"* [[{zid}]]\n")
+            else:
+                f.write("  (none)\n")
 
         logging.info(f"Summary statistics written to {output_file}")
 
@@ -114,7 +142,7 @@ class ZwikiWriter:
             "! rowspan='2' | Health Status\n"  # new column
             "|-\n"
             "! Implementations \n"
-            "! Pass / Fail / Error \n"
+            "! Pass / Fail \n"
             "! Total Tests\n"
         )
 
@@ -126,14 +154,19 @@ class ZwikiWriter:
                 continue
 
             if (min_zid is not None and zid_number < min_zid) or (
-                    max_zid is not None and zid_number > max_zid
+                max_zid is not None and zid_number > max_zid
             ):
                 continue
 
-            pass_count, fail_count, error_count, total_tests = self._count_test_status(zf)
+            pass_count, fail_count, total_tests = self._count_test_status(
+                zf
+            )
 
             # Determine health status
-            if fail_count == 0 and error_count == 0 and zf.number_of_implementations > 0:
+            if (
+                fail_count == 0
+                and zf.number_of_implementations > 0
+            ):
                 health = "✅"
             else:
                 health = "❌"
@@ -141,7 +174,7 @@ class ZwikiWriter:
             f.write(
                 f"|-\n| [[{zf.zid}]] || {zf.count_aliases} || "
                 f"{zf.number_of_implementations} || "
-                f"{pass_count} / {fail_count} / {error_count} || "
+                f"{pass_count} / {fail_count} || "
                 f"{total_tests} || {zf.count_languages} || {health}\n"
             )
 
@@ -163,9 +196,9 @@ class ZwikiWriter:
             return None
 
     @staticmethod
-    def _count_test_status(zf: Zfunction) -> tuple[int, int, int, int]:
-        """Return pass_count, fail_count, error_count, total_tests for a ZFunction."""
-        pass_count = fail_count = error_count = total_tests = 0
+    def _count_test_status(zf: Zfunction) -> tuple[int, int, int]:
+        """Return pass_count, fail_count, total_tests for a ZFunction."""
+        pass_count = fail_count = total_tests = 0
 
         for impl in zf.zimplementations:
             impl_results = getattr(impl, "test_results", {})
@@ -175,7 +208,5 @@ class ZwikiWriter:
                     pass_count += 1
                 elif status == TestStatus.FAIL:
                     fail_count += 1
-                elif status == TestStatus.ERROR:
-                    error_count += 1
 
-        return pass_count, fail_count, error_count, total_tests
+        return pass_count, fail_count, total_tests

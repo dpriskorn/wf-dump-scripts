@@ -4,8 +4,6 @@ from enum import Enum
 class TestStatus(str, Enum):
     PASS = "pass"
     FAIL = "fail"
-    ERROR = "error"
-    UNKNOWN = "unknown"
 
 
 class ZobjectType(str, Enum):

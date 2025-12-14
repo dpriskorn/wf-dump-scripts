@@ -14,25 +14,37 @@ from models.wf.zfunction import Zfunction
 
 class TestStatusManager(BaseModel):
     """Handles fetching and storing test statuses for ZFunctions."""
-    test_status_map: Dict[str, Dict[str, TestStatus]] = {}
 
-    def init_map(self, zfunctions: list[Zfunction]):
-        for zf in zfunctions:
+    test_status_map: Dict[str, Dict[str, TestStatus]] = {}
+    zfunctions: list[Zfunction]
+
+    async def fetch_statuses_apply_and_write_debug(self):
+        self.init_map()
+        await self.fetch_all()
+        self.apply_to_impls()
+        self.write_test_status_debug()
+
+    def init_map(self):
+        for zf in self.zfunctions:
             for impl in zf.zimplementations:
                 self.test_status_map.setdefault(impl.zid, {})
 
-    def apply_to_impls(self, zfunctions: list[Zfunction]):
-        for zf in zfunctions:
+    def apply_to_impls(
+        self,
+    ):
+        for zf in self.zfunctions:
             for impl in zf.zimplementations:
                 if hasattr(impl, "test_results") and impl.test_results:
                     self.test_status_map[impl.zid] = impl.test_results
 
-    async def fetch_all(self, zfunctions: list[Zfunction]):
+    async def fetch_all(
+        self,
+    ):
         async with Client(concurrency=8) as client:
             semaphore = asyncio.Semaphore(client.concurrency)
             tasks = [
                 self._fetch_single(client, semaphore, zf, impl, tester)
-                for zf in zfunctions
+                for zf in self.zfunctions
                 for impl in zf.zimplementations
                 for tester in zf.ztesters
             ]
@@ -69,4 +81,3 @@ class TestStatusManager(BaseModel):
             json.dump(serializable_map, f, indent=2)
 
         logging.debug(f"Full test_status_map written to {debug_file}")
-

@@ -10,8 +10,8 @@ class DateError(BaseException):
     pass
 
 
-class MissingData(BaseException):
-    pass
+# class MissingData(BaseException):
+#     pass
 
 
 class NoTestResultFound(BaseException):

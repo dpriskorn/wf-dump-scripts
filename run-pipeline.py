@@ -36,8 +36,7 @@ class Pipeline(BaseModel):
         for jsonl_file in jsonl_files:
             logging.info(f"Processing JSONL file: {jsonl_file}")
             self.calculator = Z8Calculator(jsonl_file=jsonl_file)
-            await self.calculator.calculate()
-            self.calculator.write_wikitext()
+            await self.calculator.process_all_z8_and_fetch_test_status_and_write_wikitext()
 
 
 if __name__ == "__main__":

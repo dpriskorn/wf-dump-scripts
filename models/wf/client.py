@@ -118,8 +118,8 @@ class Client(BaseModel):
             data = await self._get(params)
             # logger.debug("Raw response data: %s", data)
         except Exception as e:
-            logger.exception(f"Error fetching test status, {e}")
-            return TestStatus.UNKNOWN
+            raise NoTestResultFound(f"Error fetching test status, {e}")
+            # return TestStatus.UNKNOWN
 
         entries = data.get("query", {}).get("wikilambda_perform_test", [])
         logger.debug("Parsed entries: %s", entries)
@@ -155,7 +155,10 @@ class Client(BaseModel):
                 )
                 logging.debug(
                     "Fetched status: %s for ZF %s, Impl %s, Tester %s",
-                    status, function_zid, impl.zid, tester.zid
+                    status,
+                    function_zid,
+                    impl.zid,
+                    tester.zid,
                 )
             except (
                 httpx.HTTPError,
@@ -165,14 +168,14 @@ class Client(BaseModel):
                 ValueError,
                 TypeError,
             ) as e:
-                logger.warning(
+                raise NoTestResultFound(
                     "Test status fetch failed " "(function=%s impl=%s tester=%s): %s",
                     function_zid,
                     impl.zid,
                     tester.zid,
                     e,
                 )
-                status = TestStatus.ERROR
+                # status = TestStatus.ERROR
 
             results[tester.zid] = status
 

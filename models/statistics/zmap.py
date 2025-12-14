@@ -10,10 +10,11 @@ from models.wf.zentity import Zentity
 
 class ZMap(BaseModel):
     """Builds maps from JSONL files for ZTesters and ZImplementations."""
+
     jsonl_file: str = Field(
         ..., description="Path to the input JSONL file (only one file at a time)."
     )
-    progress_interval = config.log_progress_interval
+    progress_interval: int = config.log_progress_interval
 
     def build_map(self, cls, description: str) -> Dict[str, Zentity]:
         result: Dict[str, Zentity] = {}

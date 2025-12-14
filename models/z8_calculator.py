@@ -297,20 +297,21 @@ class Z8Calculator(BaseModel):
         with open(filename, "w", encoding="utf-8") as f:
             self._write_table_header(f)
             self._write_table_rows(f, min_zid, max_zid)
-            f.write("|}\n")
+            self._write_table_footer(f)
 
         logging.info(f"Wikitext table written to {filename}")
 
     def _write_table_header(self, f) -> None:
         """Write the wikitext table header."""
         f.write(
-            "; Note: Disconnected tests/implementations are not in presently in the dump\n\n"
+            "; Note: Disconnected tests/implementations are not presently in the dump\n\n"
             f"Last update: {self.last_update}\n"
             '{| class="wikitable sortable"\n'
             "! rowspan='2' | Function \n"
             "! rowspan='2' | Aliases \n"
             "! colspan='3' | Connected \n"
             "! rowspan='2' | Translations\n"
+            "! rowspan='2' | Health Status\n"  # new column
             "|-\n"
             "! Implementations \n"
             "! Pass / Fail / Error \n"
@@ -325,20 +326,31 @@ class Z8Calculator(BaseModel):
                 continue
 
             if (min_zid is not None and zid_number < min_zid) or (
-                max_zid is not None and zid_number > max_zid
+                    max_zid is not None and zid_number > max_zid
             ):
                 continue
 
-            pass_count, fail_count, error_count, total_tests = self._count_test_status(
-                zf
-            )
+            pass_count, fail_count, error_count, total_tests = self._count_test_status(zf)
+
+            # Determine health status
+            if fail_count == 0 and error_count == 0 and zf.number_of_implementations > 0:
+                health = "✅"
+            else:
+                health = "❌"
 
             f.write(
                 f"|-\n| [[{zf.zid}]] || {zf.count_aliases} || "
                 f"{zf.number_of_implementations} || "
                 f"{pass_count} / {fail_count} / {error_count} || "
-                f"{total_tests} || {zf.count_languages}\n"
+                f"{total_tests} || {zf.count_languages} || {health}\n"
             )
+
+    def _write_table_footer(self, f) -> None:
+        # Add explanation below the table
+        f.write(
+            "|}\n"
+            "\n'''Health Status Explanation''': ✅ = all tests pass AND at least one implementation exists; ❌ = otherwise\n"
+        )
 
     # ----------------- Static helpers --------------
     @staticmethod

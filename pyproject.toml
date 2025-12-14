@@ -9,10 +9,16 @@ license = {text = "GPLv3+"}
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
-    "pydantic (>=2.12.5,<3.0.0)"
+    "pydantic (>=2.12.5,<3.0.0)",
+    "tenacity (>=9.1.2,<10.0.0)"
 ]
 
 
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]
 build-backend = "poetry.core.masonry.api"
+
+[dependency-groups]
+dev = [
+    "pytest (>=9.0.2,<10.0.0)"
+]

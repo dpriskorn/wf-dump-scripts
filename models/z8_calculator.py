@@ -308,7 +308,7 @@ class Z8Calculator(BaseModel):
     def _write_table_header(self, f) -> None:
         """Write the wikitext table header."""
         f.write(
-            "; Note: Disconnected tests/implementations are not presently in the dump\n\n"
+            "'''Health Status''': ✅ = all tests pass AND at least one implementation exists, ❌ = otherwise\n\n"
             f"Last update: {self.last_update}\n"
             '{| class="wikitable sortable"\n'
             "! rowspan='2' | Function \n"
@@ -353,7 +353,7 @@ class Z8Calculator(BaseModel):
         # Add explanation below the table
         f.write(
             "|}\n"
-            "\n'''Health Status Explanation''': ✅ = all tests pass AND at least one implementation exists; ❌ = otherwise\n"
+            "Note: Disconnected tests/implementations are not presently in the dump\n\n"
         )
 
     # ----------------- Static helpers --------------

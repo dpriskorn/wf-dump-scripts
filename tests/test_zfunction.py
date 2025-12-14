@@ -5,6 +5,7 @@ from unittest import TestCase
 from models.wf.zfunction import Zfunction
 from models.wf.ztester import Ztester
 
+
 class TestZfunction(TestCase):
     def setUp(self):
         # Load sample Zfunction JSON

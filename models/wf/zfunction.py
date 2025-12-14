@@ -78,3 +78,15 @@ class Zfunction(Zentity):
             self.number_of_connected_implementations,
             self.count_testers,
         )
+
+    # ---------- Apply external connected implementations ----------
+    def apply_connected_implementations(self, impls: List[str]) -> None:
+        """
+        Apply externally fetched connected implementations to this function.
+        """
+        self.connected_implementations = impls
+        logger.debug(
+            "Applied %d connected implementations to ZFunction %s",
+            len(impls),
+            self.zid,
+        )

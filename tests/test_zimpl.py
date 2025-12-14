@@ -4,6 +4,7 @@ from models.wf.zimpl import Zimpl
 import json
 from pathlib import Path
 
+
 class TestZimpl(TestCase):
     def setUp(self):
         test_file = Path("test_data/zimplementation.json")

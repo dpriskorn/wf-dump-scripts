@@ -4,6 +4,7 @@ from unittest import TestCase
 
 from models.wf.ztester import Ztester
 
+
 class TestZtester(TestCase):
     def setUp(self):
         test_file = Path("test_data/ztester.json")

@@ -8,6 +8,7 @@ import logging
 from models.wf.client import Client
 from models.wf.zfunction import Zfunction
 from models.wf.ztester import Ztester
+import config
 
 logger = logging.getLogger(__name__)
 
@@ -45,9 +46,7 @@ class Z8Calculator(BaseModel):
                     continue
 
                 # Only include testers (Z13 type) or whatever your logic requires
-                if obj.get("Z1K1") not in tester_map and obj.get("Z1K1").startswith(
-                    "Z"
-                ):
+                if zid not in tester_map and zid.startswith("Z"):
                     tester_map[zid] = Ztester(data=obj)
 
         logging.info(f"Tester map built with {len(tester_map)} entries.")
@@ -83,33 +82,36 @@ class Z8Calculator(BaseModel):
                     zfunctions.append(func)
                     zid_count += 1
 
+                    # --- Stop after MAX_FUNCTIONS for testing ---
+                    if zid_count >= config.MAX_FUNCTIONS:
+                        logging.info(
+                            f"Reached MAX_FUNCTIONS={config.MAX_FUNCTIONS}, stopping early for testing."
+                        )
+                        break
+
         logging.info(f"Collected {zid_count} ZFunctions.")
 
-        # Fetch connected implementations
-        client = Client(concurrency=8)
-        try:
+        # Fetch connected implementations using async context manager
+        async with Client(concurrency=8) as client:
             zid_map = await client.bulk_fetch_connected_implementations(
                 item.zid for item in zfunctions
             )
-        finally:
-            await client.close()
 
-        for zentity in zfunctions:
-            zentity.apply_connected_implementations(zid_map.get(zentity.zid, []))
+        for zfunction in zfunctions:
+            zfunction.apply_connected_implementations(zid_map.get(zfunction.zid, []))
 
         # Build wikitext table
         table: List[Dict[str, Union[str, int]]] = []
-        for zentity in zfunctions:
+        for zfunction in zfunctions:
             table.append(
                 {
-                    "FunctionID": zentity.title,
-                    "Aliases": zentity.count_aliases,
-                    "Implementations": zentity.count_implementations,
-                    "Connected": zentity.number_of_connected_implementations,
-                    "Disconnected": zentity.count_implementations
-                    - zentity.number_of_connected_implementations,
-                    "Tests": zentity.count_testers,
-                    "Languages": zentity.count_languages,
+                    "FunctionID": zfunction.zid,
+                    "Aliases": zfunction.count_aliases,
+                    "Implementations": "? (not in the dump)",
+                    "Connected": zfunction.number_of_connected_implementations,
+                    "Disconnected": "? (not in the dump)",
+                    "Tests": zfunction.count_testers,
+                    "Languages": zfunction.count_languages,
                 }
             )
 
@@ -117,7 +119,7 @@ class Z8Calculator(BaseModel):
         with open(self.output_file, "w", encoding="utf-8") as f:
             f.write('{| class="wikitable sortable"\n')
             f.write(
-                "! FunctionID !! Aliases !! Implementations !! Connected !! Disconnected !! Tests !! Translations\n"
+                "! FunctionID !! Aliases !! Implementations !! Connected impl !! Disconnected impl !! Tests !! Translations\n"
             )
             for row in table:
                 f.write(

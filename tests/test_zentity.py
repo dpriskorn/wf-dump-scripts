@@ -5,6 +5,7 @@ from pathlib import Path
 from models.exceptions import NoZidFound
 from models.wf.zentity import Zentity
 
+
 class TestZentity(TestCase):
     def setUp(self):
         test_file = Path("test_data/zfunction.json")

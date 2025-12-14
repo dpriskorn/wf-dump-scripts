@@ -26,6 +26,13 @@ class Client(BaseModel):
     class Config:
         arbitrary_types_allowed = True  # Allows asyncio.Semaphore and httpx.AsyncClient
 
+    async def __aenter__(self):
+        await self.init_client()
+        return self
+
+    async def __aexit__(self, exc_type, exc, tb):
+        await self.close()
+
     async def init_client(self):
         """Initialize HTTP client and semaphore (async setup)."""
         self.semaphore = asyncio.Semaphore(self.concurrency)
@@ -96,12 +103,30 @@ class Client(BaseModel):
             return zid, []
 
     async def bulk_fetch_connected_implementations(
-        self, zids: Iterable[str]
+        self, zids: Iterable[str], progress_interval: int = 100
     ) -> Dict[str, List[str]]:
         if self.client is None or self.semaphore is None:
             raise RuntimeError("HTTP client not initialized. Call init_client first.")
 
-        results = await asyncio.gather(
-            *(self._safe_fetch_connected(zid) for zid in zids)
-        )
-        return dict(results)
+        results: Dict[str, List[str]] = {}
+
+        # Ensure we can get length for progress reporting
+        if not isinstance(zids, (list, tuple, set)):
+            zids = list(zids)
+        total = len(zids)
+        processed = 0
+
+        async def fetch_and_store(zid: str):
+            nonlocal processed
+            zid, impls = await self._safe_fetch_connected(zid)
+            results[zid] = impls
+            processed += 1
+            if processed % progress_interval == 0 or processed == total:
+                logger.info(
+                    "Fetched connected implementations for %d/%d ZIDs",
+                    processed,
+                    total,
+                )
+
+        await asyncio.gather(*(fetch_and_store(zid) for zid in zids))
+        return results

@@ -7,6 +7,7 @@ from models.dump_downloader import DumpDownloader
 from models.z8_calculator import Z8Calculator
 
 logging.basicConfig(level=config.loglevel, format=config.logformat)
+logging.getLogger("httpx").setLevel(config.httpx_loglevel)
 
 
 class Pipeline(BaseModel):

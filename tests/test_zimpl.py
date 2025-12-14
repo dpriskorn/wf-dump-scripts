@@ -12,8 +12,8 @@ class TestZimpl(TestCase):
             self.data = json.load(f)
 
     def test_is_implementation_true(self):
-        impl = Zimpl(data={"Z1K1": "Z14"})
-        assert impl.is_implementation is True
+        impl = Zimpl(data=self.data)
+        assert impl.is_correct_type is True
 
     def test_extract_connected(self):
         impl = Zimpl(data=self.data)

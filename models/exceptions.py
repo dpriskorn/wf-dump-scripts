@@ -8,3 +8,11 @@ class DateError(BaseException):
     """Raised when a date cannot be extracted"""
 
     pass
+
+
+class MissingData(BaseException):
+    pass
+
+
+class NoTestResultFound(BaseException):
+    pass

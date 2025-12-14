@@ -22,5 +22,20 @@ build-backend = "poetry.core.masonry.api"
 [dependency-groups]
 dev = [
     "pytest (>=9.0.2,<10.0.0)",
-    "black (>=25.12.0,<26.0.0)"
+    "black (>=25.12.0,<26.0.0)",
+    "deadcode (>=2.4.1,<3.0.0)",
+    "pytest-asyncio (>=1.3.0,<2.0.0)"
 ]
+
+[tool.deadcode]
+# ignore specific names so they won’t be reported as unused
+ignore-names = [
+  "arbitrary_types_allowed",
+    "setUp",
+    "Config"
+]
+
+# other useful ignores
+ignore-names-if-inherits-from = []
+ignore-names-if-decorated-with = []
+ignore-names-in-files = []

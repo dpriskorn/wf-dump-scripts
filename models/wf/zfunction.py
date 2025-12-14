@@ -1,9 +1,12 @@
 # ./models/wf/zfunction.py
 import logging
+from pprint import pprint
 from typing import List, Dict
 
 from pydantic import Field
 
+import config
+from models.wf.enums import ZobjectType
 from models.wf.zentity import Zentity
 from models.wf.zimpl import Zimpl
 from models.wf.ztester import Ztester
@@ -16,26 +19,15 @@ class Zfunction(Zentity):
     Z8 function wrapper.
     """
 
-    connected_implementations: List[str] = Field(default_factory=list)
-    ztesters: List[Ztester] = Field(default_factory=list)
-    zimpl: List[Zimpl] = Field(default_factory=list)
+    EXPECTED_TYPE: ZobjectType = ZobjectType.FUNCTION
 
-    # ---------- Identity ----------
-    @property
-    def is_function(self) -> bool:
-        if not isinstance(self.data, dict):
-            return False
-        z2k2 = self.data.get("Z2K2")
-        return isinstance(z2k2, dict) and z2k2.get("Z1K1") == "Z8"
+    ztesters: List[Ztester] = Field(default_factory=list)
+    zimplementations: List[Zimpl] = Field(default_factory=list)
 
     # ---------- Counts ----------
     @property
-    def number_of_connected_implementations(self) -> int:
-        return len(self.connected_implementations)
-
-    @property
-    def count_testers(self) -> int:
-        return len(self.ztesters)
+    def number_of_implementations(self) -> int:
+        return len(self.zimplementations)
 
     # ---------- Population ----------
     def extract_ztesters(self, map_: Dict[str, Ztester]) -> None:
@@ -43,6 +35,9 @@ class Zfunction(Zentity):
         Populate self.ztesters by looking up ZIDs in Z2K2 > Z8K3.
         """
         z2k2 = self.data.get("Z2K2")
+        logger.debug(f"Processing: ")
+        if config.loglevel == logging.DEBUG:
+            pprint(z2k2)
         if not isinstance(z2k2, dict):
             return
 
@@ -58,54 +53,42 @@ class Zfunction(Zentity):
             tester = map_.get(zid)
             if tester:
                 self.ztesters.append(tester)
+        logger.debug(
+            "ZFunction %s extracted testers: %s",
+            self.zid,
+            [i.zid for i in self.ztesters],
+        )
 
     def extract_zimpl(self, map_: Dict[str, Zimpl]) -> None:
         """
         Populate self.zimpl by looking up ZIDs in Z2K2 > Z8K4.
         See https://www.wikifunctions.org/view/en/Z8
         """
-        z2k2 = self.data.get("Z2K2")
-        if not isinstance(z2k2, dict):
+        value_of_persistant_object = self.data.get("Z2K2")
+        logger.debug(f"Processing: value_of_persistant_object")
+        if config.loglevel == logging.DEBUG:
+            pprint(value_of_persistant_object)
+        if not isinstance(value_of_persistant_object, dict):
             return
 
-        z8k4 = z2k2.get("Z8K4")
-        if not z8k4:
+        implementation_data = value_of_persistant_object.get("Z8K4")
+        logger.debug(f"Processing: implementation_data:")
+        if config.loglevel == logging.DEBUG:
+            pprint(implementation_data)
+        if not implementation_data:
             return
 
         # Ensure z8k4 is a list
-        if isinstance(z8k4, str):
-            z8k4 = [z8k4]
+        if isinstance(implementation_data, str):
+            implementation_data = [implementation_data]
 
-        for zid in z8k4:
+        for zid in implementation_data:
+            logger.debug(f"Looking up: {zid}")
             zimpl = map_.get(zid)
             if zimpl:
-                self.zimpl.append(zimpl)
-
-    def populate(self) -> None:
-        """
-        Populate implementations.
-        Call extract_testers separately with tester_map.
-        """
-        if not self.is_function:
-            return
-
-        self.connected_implementations = Zimpl(data=self.data).extract_connected()
-
+                self.zimplementations.append(zimpl)
         logger.debug(
-            "ZFunction %s: %d implementations, %d testers",
+            "ZFunction %s extracted impls: %s",
             self.zid,
-            self.number_of_connected_implementations,
-            self.count_testers,
-        )
-
-    # ---------- Apply external connected implementations ----------
-    def apply_connected_implementations(self, impls: List[str]) -> None:
-        """
-        Apply externally fetched connected implementations to this function.
-        """
-        self.connected_implementations = impls
-        logger.debug(
-            "Applied %d connected implementations to ZFunction %s",
-            len(impls),
-            self.zid,
+            [i.zid for i in self.zimplementations],
         )

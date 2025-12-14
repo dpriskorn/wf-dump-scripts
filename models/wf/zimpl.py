@@ -1,10 +1,14 @@
 # ./models/zimpl.py
-from typing import List
+from typing import List, Dict
 
+from models.wf.enums import ZobjectType, TestStatus
 from models.wf.zentity import Zentity
 
 
 class Zimpl(Zentity):
+    EXPECTED_TYPE: ZobjectType = ZobjectType.IMPLEMENTATION
+    test_results: Dict[str, TestStatus] = {}
+
     def extract_connected(self) -> List[str]:
         """
         Extract connected Z14 implementations from a ZFunction.
@@ -19,7 +23,3 @@ class Zimpl(Zentity):
 
         # Typed list: ["Z14", impl1, impl2, ...]
         return impls[1:]
-
-    @property
-    def is_implementation(self) -> bool:
-        return isinstance(self.data, dict) and self.data.get("Z1K1") == "Z14"

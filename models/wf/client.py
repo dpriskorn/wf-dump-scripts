@@ -1,7 +1,8 @@
 # models/wikifunctions_client.py
 import asyncio
 import logging
-from typing import Iterable, Dict, List, Optional
+from typing import Dict, Optional, List
+from urllib.parse import urlencode
 
 import httpx
 from pydantic import BaseModel, Field
@@ -13,6 +14,11 @@ from tenacity import (
 )
 
 import config
+from models.exceptions import NoTestResultFound
+from models.wf.enums import TestStatus
+from models.wf.zfunction import Zfunction
+from models.wf.zimpl import Zimpl
+from models.wf.ztester import Ztester
 
 logger = logging.getLogger(__name__)
 
@@ -24,7 +30,8 @@ class Client(BaseModel):
     semaphore: Optional[asyncio.Semaphore] = None
 
     class Config:
-        arbitrary_types_allowed = True  # Allows asyncio.Semaphore and httpx.AsyncClient
+        arbitrary_types_allowed = True
+        extra = "allow"
 
     async def __aenter__(self):
         await self.init_client()
@@ -71,62 +78,124 @@ class Client(BaseModel):
             return resp.json()
 
     # ---------- high-level APIs ----------
+    async def fetch_test_status(
+        self,
+        function_zid: str,
+        impl_zid: str,
+        tester_zid: str,
+    ) -> TestStatus:
+        """
+        Example url and response:
+        https://www.wikifunctions.org/w/api.php?action=wikilambda_perform_test&format=json&formatversion=2&wikilambda_perform_test_zfunction=Z27327&wikilambda_perform_test_zimplementations=Z30176&wikilambda_perform_test_ztesters=Z27328&uselang=en
+        :param function_zid:
+        :param impl_zid:
+        :param tester_zid:
+        :return:
+        """
+        logger.debug(
+            "Fetching test status for Function=%s, Implementation=%s, Tester=%s",
+            function_zid,
+            impl_zid,
+            tester_zid,
+        )
 
-    async def fetch_connected_implementations(
-        self, zid: str, limit: int = 100
-    ) -> List[str]:
         params = {
-            "action": "query",
+            "action": "wikilambda_perform_test",  # <-- correct API action
             "format": "json",
             "formatversion": 2,
-            "list": "wikilambdafn_search",
-            "wikilambdafn_zfunction_id": zid,
-            "wikilambdafn_type": "Z14",
-            "wikilambdafn_limit": limit,
+            "wikilambda_perform_test_zfunction": function_zid,
+            "wikilambda_perform_test_zimplementations": impl_zid,
+            "wikilambda_perform_test_ztesters": tester_zid,
+            "uselang": "en",
         }
 
-        data = await self._get(params)
-        impls = [
-            entry["zid"]
-            for entry in data.get("query", {}).get("wikilambdafn_search", [])
-            if "zid" in entry
-        ]
-        logger.debug("ZID %s → %d implementations", zid, len(impls))
-        return impls
+        # Build a clickable URL using the configured base URL
+        full_url = f"{config.BASE_API_URL}?{urlencode(params)}"
+        logger.debug("Query URL: %s", full_url)
+        logger.debug("Query parameters: %s", params)
 
-    async def _safe_fetch_connected(self, zid: str) -> (str, List[str]):
         try:
-            impls = await self.fetch_connected_implementations(zid)
-            return zid, impls
-        except (asyncio.TimeoutError, OSError, httpx.HTTPError) as e:
-            logger.warning("Failed fetching implementations for %s: %s", zid, e)
-            return zid, []
+            data = await self._get(params)
+            # logger.debug("Raw response data: %s", data)
+        except Exception as e:
+            logger.exception(f"Error fetching test status, {e}")
+            return TestStatus.UNKNOWN
 
-    async def bulk_fetch_connected_implementations(
-        self, zids: Iterable[str], progress_interval: int = 100
-    ) -> Dict[str, List[str]]:
-        if self.client is None or self.semaphore is None:
-            raise RuntimeError("HTTP client not initialized. Call init_client first.")
+        entries = data.get("query", {}).get("wikilambda_perform_test", [])
+        logger.debug("Parsed entries: %s", entries)
 
-        results: Dict[str, List[str]] = {}
+        if not entries:
+            logger.debug("No entries returned, status UNKNOWN")
+            raise NoTestResultFound(f"See {full_url}")
 
-        # Ensure we can get length for progress reporting
-        if not isinstance(zids, (list, tuple, set)):
-            zids = list(zids)
-        total = len(zids)
-        processed = 0
+        status_raw = entries[0].get("validateStatus", "")
+        logger.debug("Raw status from entry: '%s'", status_raw)
 
-        async def fetch_and_store(zid: str):
-            nonlocal processed
-            zid, impls = await self._safe_fetch_connected(zid)
-            results[zid] = impls
-            processed += 1
-            if processed % progress_interval == 0 or processed == total:
-                logger.info(
-                    "Fetched connected implementations for %d/%d ZIDs",
-                    processed,
-                    total,
+        if "Z41" in status_raw:
+            logger.debug("Test passed")
+            return TestStatus.PASS
+
+        logger.debug("Test failed")
+        return TestStatus.FAIL
+
+    async def fetch_impl_test_statuses(
+        self,
+        function_zid: str,
+        impl: Zimpl,
+        testers: List[Ztester],
+    ) -> Dict[str, TestStatus]:
+        results: Dict[str, TestStatus] = {}
+
+        for tester in testers:
+            try:
+                status = await self.fetch_test_status(
+                    function_zid,
+                    impl.zid,
+                    tester.zid,
                 )
+                logging.debug(
+                    "Fetched status: %s for ZF %s, Impl %s, Tester %s",
+                    status, function_zid, impl.zid, tester.zid
+                )
+            except (
+                httpx.HTTPError,
+                asyncio.TimeoutError,
+                OSError,
+                KeyError,
+                ValueError,
+                TypeError,
+            ) as e:
+                logger.warning(
+                    "Test status fetch failed " "(function=%s impl=%s tester=%s): %s",
+                    function_zid,
+                    impl.zid,
+                    tester.zid,
+                    e,
+                )
+                status = TestStatus.ERROR
 
-        await asyncio.gather(*(fetch_and_store(zid) for zid in zids))
+            results[tester.zid] = status
+
         return results
+
+    async def fetch_function_test_status_map(
+        self,
+        function: Zfunction,
+    ) -> Dict[str, Dict[str, TestStatus]]:
+        result: Dict[str, Dict[str, TestStatus]] = {}
+
+        tasks = [
+            self.fetch_impl_test_statuses(
+                function.zid,
+                impl,
+                function.ztesters,
+            )
+            for impl in function.zimplementations
+        ]
+
+        impl_results = await asyncio.gather(*tasks)
+
+        for impl, statuses in zip(function.zimplementations, impl_results):
+            result[impl.zid] = statuses
+
+        return result

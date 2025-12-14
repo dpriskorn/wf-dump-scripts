@@ -39,7 +39,7 @@ class TestZfunction(TestCase):
 
     def test_is_function_true(self):
         func = Zfunction(data=self.zfunction_data)
-        self.assertTrue(func.is_function)
+        self.assertTrue(func.is_correct_type)
 
     def test_extract_ztesters(self):
         func = Zfunction(data=self.zfunction_data)
@@ -54,21 +54,14 @@ class TestZfunction(TestCase):
         func = Zfunction(data=self.zfunction_data)
         func.extract_zimpl(self.impl_map)
 
-        self.assertEqual(len(func.zimpl), len(self.impl_map))
-        for impl in func.zimpl:
+        self.assertEqual(len(func.zimplementations), len(self.impl_map))
+        for impl in func.zimplementations:
             self.assertIsInstance(impl, Zimpl)
             self.assertIn(impl.zid, self.impl_map)
-
-    def test_populate_and_apply_connected_implementations(self):
-        func = Zfunction(data=self.zfunction_data)
-        func.populate()
-        connected = ["Z27327", "Z802"]
-        func.apply_connected_implementations(connected)
-        self.assertEqual(func.connected_implementations, connected)
 
     def test_empty_maps(self):
         func = Zfunction(data=self.zfunction_data)
         func.extract_ztesters({})
         func.extract_zimpl({})
         self.assertEqual(len(func.ztesters), 0)
-        self.assertEqual(len(func.zimpl), 0)
+        self.assertEqual(len(func.zimplementations), 0)

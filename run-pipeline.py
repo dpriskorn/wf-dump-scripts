@@ -4,7 +4,8 @@ import time
 import config
 from pydantic import BaseModel
 from models.dump_converter import DumpConverter
-from models.dump_downloader import DumpDownloader
+
+# from models.dump_downloader import DumpDownloader
 from models.z8_calculator import Z8Calculator
 
 logging.basicConfig(level=config.loglevel, format=config.logformat)
@@ -15,7 +16,7 @@ class Pipeline(BaseModel):
     class Config:
         arbitrary_types_allowed = True
 
-    downloader: DumpDownloader = DumpDownloader()
+    # downloader: DumpDownloader = DumpDownloader()
     converter: DumpConverter = DumpConverter()
     calculator: Z8Calculator | None = None
 

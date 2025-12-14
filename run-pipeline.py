@@ -6,7 +6,7 @@ from pydantic import BaseModel
 from models.dump_converter import DumpConverter
 
 # from models.dump_downloader import DumpDownloader
-from models.z8_calculator import Z8Calculator
+from models.statistics.z8_calculator import Z8Calculator
 
 logging.basicConfig(level=config.loglevel, format=config.logformat)
 logging.getLogger("httpx").setLevel(config.httpx_loglevel)

@@ -30,7 +30,7 @@ class Zfunction(Zentity):
         return len(self.zimplementations)
 
     # ---------- Population ----------
-    def extract_ztesters(self, map_: Dict[str, Ztester]) -> None:
+    def extract_ztesters(self, map_: Dict[str, Zentity]) -> None:
         """
         Populate self.ztesters by looking up ZIDs in Z2K2 > Z8K3.
         """
@@ -51,7 +51,7 @@ class Zfunction(Zentity):
 
         for zid in z8k3:
             tester = map_.get(zid)
-            if tester:
+            if tester and isinstance(tester, Ztester):
                 self.ztesters.append(tester)
         logger.debug(
             "ZFunction %s extracted testers: %s",
@@ -59,7 +59,7 @@ class Zfunction(Zentity):
             [i.zid for i in self.ztesters],
         )
 
-    def extract_zimpl(self, map_: Dict[str, Zimpl]) -> None:
+    def extract_zimpl(self, map_: Dict[str, Zentity]) -> None:
         """
         Populate self.zimpl by looking up ZIDs in Z2K2 > Z8K4.
         See https://www.wikifunctions.org/view/en/Z8
@@ -85,7 +85,7 @@ class Zfunction(Zentity):
         for zid in implementation_data:
             logger.debug(f"Looking up: {zid}")
             zimpl = map_.get(zid)
-            if zimpl:
+            if zimpl and isinstance(zimpl, Zimpl):
                 self.zimplementations.append(zimpl)
         logger.debug(
             "ZFunction %s extracted impls: %s",

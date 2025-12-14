@@ -18,6 +18,7 @@ class Zfunction(Zentity):
 
     connected_implementations: List[str] = Field(default_factory=list)
     ztesters: List[Ztester] = Field(default_factory=list)
+    zimpl: List[Zimpl] = Field(default_factory=list)
 
     # ---------- Identity ----------
     @property
@@ -37,30 +38,48 @@ class Zfunction(Zentity):
         return len(self.ztesters)
 
     # ---------- Population ----------
-    def extract_testers(self, tester_map: Dict[str, Ztester]) -> None:
+    def extract_ztesters(self, map: Dict[str, Ztester]) -> None:
         """
-        Populate self.ztesters by looking up ZIDs in the prebuilt tester_map.
+        Populate self.ztesters by looking up ZIDs in Z2K2 > Z8K3.
         """
-        self.ztesters = []
-
         z2k2 = self.data.get("Z2K2")
         if not isinstance(z2k2, dict):
             return
 
-        z8k1 = z2k2.get("Z8K1")
-        if not z8k1:
+        z8k3 = z2k2.get("Z8K3")
+        if not z8k3:
             return
 
-        # Flatten Z8K1 to get all tester ZIDs
-        to_flatten = {"root": z8k1} if isinstance(z8k1, list) else z8k1
-        flat_dict = flatten(to_flatten)
-        tester_zids = {v for v in flat_dict.values() if isinstance(v, str)}
+        # Ensure z8k3 is a list
+        if isinstance(z8k3, str):
+            z8k3 = [z8k3]
 
-        # Lookup in the prebuilt map
-        for zid in tester_zids:
-            tester = tester_map.get(zid)
+        for zid in z8k3:
+            tester = map.get(zid)
             if tester:
                 self.ztesters.append(tester)
+
+    def extract_zimpl(self, map: Dict[str, Zimpl]) -> None:
+        """
+        Populate self.zimpl by looking up ZIDs in Z2K2 > Z8K4.
+        See https://www.wikifunctions.org/view/en/Z8
+        """
+        z2k2 = self.data.get("Z2K2")
+        if not isinstance(z2k2, dict):
+            return
+
+        z8k4 = z2k2.get("Z8K4")
+        if not z8k4:
+            return
+
+        # Ensure z8k4 is a list
+        if isinstance(z8k4, str):
+            z8k4 = [z8k4]
+
+        for zid in z8k4:
+            zimpl = map.get(zid)
+            if zimpl:
+                self.zimpl.append(zimpl)
 
     def populate(self) -> None:
         """

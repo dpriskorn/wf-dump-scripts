@@ -50,62 +50,60 @@ class Z8Calculator(BaseModel):
     class Config:
         arbitrary_types_allowed = True
 
-    def build_ztester_map(self) -> None:
-        """Populate self.tester_map with ZID -> Ztester objects."""
+    def build_map(
+            self,
+            cls: type,
+            target_map: Dict[str, BaseModel],
+            check_attr: str,
+            description: str
+    ) -> None:
+        """
+        Generic method to populate a map with ZID -> object of type cls.
+
+        Args:
+            cls: The class to instantiate (Ztester or Zimpl).
+            target_map: The dictionary to populate.
+            check_attr: Attribute name to check (e.g., 'is_tester' or 'is_implementation').
+            description: Text description for logging.
+        """
         processed = 0
-        logging.info(f"Building tester map from {self.jsonl_file}...")
+        logging.info(f"Building {description} from {self.jsonl_file}...")
 
         with open(self.jsonl_file, "r", encoding="utf-8") as f:
             for line in f:
                 processed += 1
                 if processed % self.progress_interval == 0:
-                    logging.info(f"Processed {processed} lines for tester map...")
+                    logging.info(f"Processed {processed} lines for {description}...")
 
                 try:
                     data = json.loads(line)
                 except json.JSONDecodeError:
                     continue
 
-                ztester = Ztester(data=data)
-                if ztester.is_tester:
-                    zid = ztester.zid
-                    if zid and zid not in self.ztester_map:
-                        self.ztester_map[zid] = ztester
+                obj = cls(data=data)
+                if getattr(obj, check_attr, False):
+                    zid = getattr(obj, "zid", None)
+                    if zid and zid not in target_map:
+                        target_map[zid] = obj
 
-        logging.info(f"Tester map built with {len(self.ztester_map)} entries.")
+        logging.info(f"{description} built with {len(target_map)} entries.")
+
+    # Then replace the original methods with:
+
+    def build_ztester_map(self) -> None:
+        self.build_map(Ztester, self.ztester_map, "is_tester", "tester map")
 
     def build_zimpl_map(self) -> None:
-        """Populate self.impl_map with ZID -> Zimpl objects."""
-        text = "implementation map"
-        processed = 0
-        logging.info(f"Building {text} from {self.jsonl_file}...")
-
-        with open(self.jsonl_file, "r", encoding="utf-8") as f:
-            for line in f:
-                processed += 1
-                if processed % self.progress_interval == 0:
-                    logging.info(f"Processed {processed} lines for {text}...")
-
-                try:
-                    data = json.loads(line)
-                except json.JSONDecodeError:
-                    continue
-
-                zimpl = Zimpl(data=data)
-                if zimpl.is_implementation:
-                    zid = zimpl.zid
-                    if zid and zid not in self.zimpl_map:
-                        self.zimpl_map[zid] = zimpl
-
-        logging.info(f"{text} built with {len(self.impl_map)} entries.")
+        self.build_map(Zimpl, self.zimpl_map, "is_implementation", "implementation map")
 
     async def calculate(self) -> None:
         """Compute ZFunctions and connected implementations; populate self.zfunctions and self.table."""
         self.zfunctions = []
         zid_count = 0
 
-        # Build tester map
+        # Build maps
         self.build_tester_map()
+        self.build_zimpl_map()
 
         logging.info(f"Processing functions from {self.jsonl_file}...")
         processed = 0
@@ -126,7 +124,8 @@ class Z8Calculator(BaseModel):
                 func = Zfunction(data=obj)
                 if func.is_function:
                     func.populate()
-                    func.extract_testers(self.ztester_map)
+                    func.extract_ztesters(self.ztester_map)
+                    func.extract_zimpl(self.ztester_map)
                     self.zfunctions.append(func)
                     zid_count += 1
 

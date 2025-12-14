@@ -4,37 +4,61 @@ from unittest import TestCase
 
 from models.wf.zfunction import Zfunction
 from models.wf.ztester import Ztester
+from models.wf.zimpl import Zimpl
 
 
 class TestZfunction(TestCase):
     def setUp(self):
         # Load sample Zfunction JSON
-        test_file = Path("test_data/zfunction.json")
-        with test_file.open("r", encoding="utf-8") as f:
-            self.data = json.load(f)
+        zfunc_file = Path("test_data/zfunction.json")
+        with zfunc_file.open("r", encoding="utf-8") as f:
+            self.zfunction_data = json.load(f)
 
-        # Build a simple tester map
-        # normally this comes from Z8Calculator.build_tester_map
-        self.tester_map = {}
-        # For test purposes, all strings in Z8K1 are turned into Ztester objects
-        z8k1 = self.data.get("Z2K2", {}).get("Z8K1", [])
-        for item in z8k1:
-            if isinstance(item, str):
-                self.tester_map[item] = Ztester(data={"Z1K1": "Z13", "name": item})
-            elif isinstance(item, dict):
-                name = item.get("Z17K1") or item.get("Z17K2")
-                if name:
-                    self.tester_map[name] = Ztester(data={"Z1K1": "Z13", "name": name})
+        # Mock maps with keys matching Z8K3 and Z8K4
+        self.impl_map = {
+            "Z14": Zimpl(data={"Z1K1": "Z2", "Z2K1": {"Z1K1": "Z6", "Z6K1": "Z14"}}),
+            "Z27335": Zimpl(data={"Z1K1": "Z2", "Z2K1": {"Z1K1": "Z6", "Z6K1": "Z27335"}}),
+        }
+        self.tester_map = {
+            "Z20": Ztester(data={"Z1K1": "Z2", "Z2K1": {"Z1K1": "Z6", "Z6K1": "Z20"}}),
+            "Z27328": Ztester(data={"Z1K1": "Z2", "Z2K1": {"Z1K1": "Z6", "Z6K1": "Z27328"}}),
+            "Z27329": Ztester(data={"Z1K1": "Z2", "Z2K1": {"Z1K1": "Z6", "Z6K1": "Z27329"}}),
+            "Z27331": Ztester(data={"Z1K1": "Z2", "Z2K1": {"Z1K1": "Z6", "Z6K1": "Z27331"}}),
+            "Z27891": Ztester(data={"Z1K1": "Z2", "Z2K1": {"Z1K1": "Z6", "Z6K1": "Z27891"}}),
+        }
 
     def test_is_function_true(self):
-        func = Zfunction(data=self.data)
-        assert func.is_function is True
+        func = Zfunction(data=self.zfunction_data)
+        self.assertTrue(func.is_function)
 
-    def test_populate_connected_and_testers(self):
-        func = Zfunction(data=self.data)
-        func.populate()  # populate implementations
-        func.extract_testers(self.tester_map)  # populate testers from map
-        # Implementations are populated from Zimpl
-        assert func.number_of_connected_implementations >= 0
-        assert func.count_testers == len(func.ztesters)
-        assert all(isinstance(t, Ztester) for t in func.ztesters)
+    def test_extract_ztesters(self):
+        func = Zfunction(data=self.zfunction_data)
+        func.extract_ztesters(self.tester_map)
+
+        self.assertEqual(len(func.ztesters), len(self.tester_map))
+        for t in func.ztesters:
+            self.assertIsInstance(t, Ztester)
+            self.assertIn(t.zid, self.tester_map)
+
+    def test_extract_zimpl(self):
+        func = Zfunction(data=self.zfunction_data)
+        func.extract_zimpl(self.impl_map)
+
+        self.assertEqual(len(func.zimpl), len(self.impl_map))
+        for impl in func.zimpl:
+            self.assertIsInstance(impl, Zimpl)
+            self.assertIn(impl.zid, self.impl_map)
+
+    def test_populate_and_apply_connected_implementations(self):
+        func = Zfunction(data=self.zfunction_data)
+        func.populate()
+        connected = ["Z27327", "Z802"]
+        func.apply_connected_implementations(connected)
+        self.assertEqual(func.connected_implementations, connected)
+
+    def test_empty_maps(self):
+        func = Zfunction(data=self.zfunction_data)
+        func.extract_ztesters({})
+        func.extract_zimpl({})
+        self.assertEqual(len(func.ztesters), 0)
+        self.assertEqual(len(func.zimpl), 0)

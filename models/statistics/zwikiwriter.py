@@ -27,19 +27,26 @@ class ZwikiWriter(BaseModel):
     last_update: str = Field(default="", description="Timestamp of the last update.")
 
     def extract_date(self):
-        # Extract date from filename
         basename = os.path.basename(self.jsonl_file)
-        match = re.search(r"(\d{8})", basename)
-        if match:
-            date_str = match.group(1)
-            try:
-                self.last_update = datetime.strptime(date_str, "%Y%m%d").strftime(
-                    "%Y-%m-%d"
-                )
-            except ValueError:
-                raise DateError()
-        else:
-            raise DateError()
+
+    # Try to extract YYYY-MM-DD
+        match = re.search(r"(\d{4}-\d{2}-\d{2})", basename)
+
+        if not match:
+            raise DateError(
+                f"Could not extract date from filename: '{basename}'. "
+            "Expected format YYYY-MM-DD somewhere in filename."
+            )
+
+        date_str = match.group(1)
+
+        try:
+            self.last_update = datetime.strptime(date_str, "%Y-%m-%d")
+        except ValueError as e:
+            raise DateError(
+            f"Invalid date format extracted from filename: '{date_str}' "
+            f"(from '{basename}'). Expected YYYY-MM-DD."
+            ) from e
 
     def write_wikitext(self):
         self.extract_date()
@@ -125,7 +132,7 @@ class ZwikiWriter(BaseModel):
             }
 
             for label, count in failed_test_stats.items():
-                percentage = round((count * 100) / num_functions)
+                percentage = round((count * 100) / num_functions) if num_functions else 0
                 f.write(f"  {label}: {count} ({percentage}%)\n")
 
             f.write("\n=== Total tests by status ===\n")
@@ -136,7 +143,7 @@ class ZwikiWriter(BaseModel):
             }
 
             for label, count in test_status_stats.items():
-                percentage = round((count * 100) / total_tests)
+                percentage = round((count * 100) / total_tests) if total_tests else 0
                 f.write(f"  {label}: {count} ({percentage}%)\n")
 
             f.write("\n== Maintenance candidates ==\n")

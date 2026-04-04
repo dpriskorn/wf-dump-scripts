@@ -26,23 +26,33 @@ logger = logging.getLogger(__name__)
 class Client(BaseModel):
     concurrency: int = Field(default=8)
     timeout: float = Field(default=10.0)
+
     client: Optional[httpx.AsyncClient] = None
     semaphore: Optional[asyncio.Semaphore] = None
+
+    username: str = Field(default=config.BOT_USERNAME)
+    password: str = Field(default=config.BOT_PASSWORD)
+
+    logged_in: bool = False
+    login_lock: asyncio.Lock = Field(default_factory=asyncio.Lock)
 
     class Config:
         arbitrary_types_allowed = True
         extra = "allow"
 
+    # ---------- lifecycle ----------
+
     async def __aenter__(self):
         await self.init_client()
+        await self.ensure_login()
         return self
 
     async def __aexit__(self, exc_type, exc, tb):
         await self.close()
 
     async def init_client(self):
-        """Initialize HTTP client and semaphore (async setup)."""
         self.semaphore = asyncio.Semaphore(self.concurrency)
+
         self.client = httpx.AsyncClient(
             base_url=config.BASE_API_URL,
             headers={"User-Agent": config.user_agent},
@@ -54,6 +64,87 @@ class Client(BaseModel):
         if self.client:
             await self.client.aclose()
 
+    # ---------- auth ----------
+
+    async def login(self):
+        """
+        MediaWiki bot login using AsyncClient.
+        Keeps session cookies automatically.
+        """
+
+        if self.client is None:
+            raise RuntimeError("Client not initialized")
+
+        logger.debug("Fetching login token")
+
+        # 1. get login token
+        r1 = await self.client.get(
+            "",
+            params={
+                "action": "query",
+                "meta": "tokens",
+                "type": "login",
+                "format": "json",
+            },
+        )
+        r1.raise_for_status()
+
+        login_token = r1.json()["query"]["tokens"]["logintoken"]
+
+        logger.debug("Logging in as %s", self.username)
+
+        # 2. login
+        r2 = await self.client.post(
+            config.BASE_API_URL,
+            data={
+                "action": "login",
+                "lgname": self.username,
+                "lgpassword": self.password,
+                "lgtoken": login_token,
+                "format": "json",
+            },
+            headers={
+                "Content-Type": "application/x-www-form-urlencoded"
+            },
+        )
+        logger.error("Login raw response status: %s", r2.status_code)
+        logger.error("Login raw response headers: %s", r2.headers)
+        logger.error("Login raw response text: %s", r2.text[:500])
+        r2.raise_for_status()
+
+        data = r2.json()
+
+        if data.get("login", {}).get("result") != "Success":
+            raise Exception(f"Login failed: {data}")
+
+        self.logged_in = True
+        logger.debug("Login successful")
+
+    async def ensure_login(self):
+        """
+        Ensures login happens once even with concurrency.
+        """
+        if self.logged_in:
+            return
+
+        async with self.login_lock:
+            if not self.logged_in:
+                await self.login()
+
+    async def get_userinfo(self) -> dict:
+        await self.ensure_login()
+
+        r = await self.client.get(
+            "",
+            params={
+                "action": "query",
+                "meta": "userinfo",
+                "format": "json",
+            },
+        )
+        r.raise_for_status()
+        return r.json()
+
     # ---------- low-level request ----------
 
     @retry(
@@ -62,45 +153,36 @@ class Client(BaseModel):
         retry=retry_if_exception_type((httpx.HTTPError,)),
     )
     async def _get(self, params: dict) -> dict:
-        if self.semaphore is None or self.client is None:
-            raise RuntimeError("HTTP client not initialized. Call init_client first.")
+        if self.client is None or self.semaphore is None:
+            raise RuntimeError("Client not initialized")
+
+        await self.ensure_login()
 
         async with self.semaphore:
             full_url = httpx.URL(self.client.base_url, params=params)
             logger.debug("Fetching URL: %s", full_url)
 
             resp = await self.client.get("", params=params)
+
             if resp.status_code == 429:
                 raise httpx.HTTPError("Rate limited (429)")
+
             resp.raise_for_status()
 
-            logger.debug("Final URL after redirects: %s", resp.url)
+            logger.debug("Final URL: %s", resp.url)
             return resp.json()
 
     # ---------- high-level APIs ----------
+
     async def fetch_test_status(
         self,
         function_zid: str,
         impl_zid: str,
         tester_zid: str,
     ) -> TestStatus:
-        """
-        Example url and response:
-        https://www.wikifunctions.org/w/api.php?action=wikilambda_perform_test&format=json&formatversion=2&wikilambda_perform_test_zfunction=Z27327&wikilambda_perform_test_zimplementations=Z30176&wikilambda_perform_test_ztesters=Z27328&uselang=en
-        :param function_zid:
-        :param impl_zid:
-        :param tester_zid:
-        :return:
-        """
-        logger.debug(
-            "Fetching test status for Function=%s, Implementation=%s, Tester=%s",
-            function_zid,
-            impl_zid,
-            tester_zid,
-        )
 
         params = {
-            "action": "wikilambda_perform_test",  # <-- correct API action
+            "action": "wikilambda_perform_test",
             "format": "json",
             "formatversion": 2,
             "wikilambda_perform_test_zfunction": function_zid,
@@ -109,33 +191,24 @@ class Client(BaseModel):
             "uselang": "en",
         }
 
-        # Build a clickable URL using the configured base URL
         full_url = f"{config.BASE_API_URL}?{urlencode(params)}"
         logger.debug("Query URL: %s", full_url)
-        logger.debug("Query parameters: %s", params)
 
         try:
             data = await self._get(params)
-            # logger.debug("Raw response data: %s", data)
         except Exception as e:
-            raise NoTestResultFound(f"Error fetching test status, {e}")
-            # return TestStatus.UNKNOWN
+            raise NoTestResultFound(f"Error fetching test status: {e}")
 
         entries = data.get("query", {}).get("wikilambda_perform_test", [])
-        logger.debug("Parsed entries: %s", entries)
 
         if not entries:
-            logger.debug("No entries returned, status UNKNOWN")
-            raise NoTestResultFound(f"See {full_url}")
+            raise NoTestResultFound(f"No result. See {full_url}")
 
         status_raw = entries[0].get("validateStatus", "")
-        logger.debug("Raw status from entry: '%s'", status_raw)
 
         if "Z41" in status_raw:
-            logger.debug("Test passed")
             return TestStatus.PASS
 
-        logger.debug("Test failed")
         return TestStatus.FAIL
 
     async def fetch_impl_test_statuses(
@@ -144,6 +217,7 @@ class Client(BaseModel):
         impl: Zimpl,
         testers: List[Ztester],
     ) -> Dict[str, TestStatus]:
+
         results: Dict[str, TestStatus] = {}
 
         for tester in testers:
@@ -153,29 +227,10 @@ class Client(BaseModel):
                     impl.zid,
                     tester.zid,
                 )
-                logging.debug(
-                    "Fetched status: %s for ZF %s, Impl %s, Tester %s",
-                    status,
-                    function_zid,
-                    impl.zid,
-                    tester.zid,
-                )
-            except (
-                httpx.HTTPError,
-                asyncio.TimeoutError,
-                OSError,
-                KeyError,
-                ValueError,
-                TypeError,
-            ) as e:
+            except Exception as e:
                 raise NoTestResultFound(
-                    "Test status fetch failed " "(function=%s impl=%s tester=%s): %s",
-                    function_zid,
-                    impl.zid,
-                    tester.zid,
-                    e,
+                    f"Failed (function={function_zid} impl={impl.zid} tester={tester.zid}): {e}"
                 )
-                # status = TestStatus.ERROR
 
             results[tester.zid] = status
 
@@ -185,7 +240,6 @@ class Client(BaseModel):
         self,
         function: Zfunction,
     ) -> Dict[str, Dict[str, TestStatus]]:
-        result: Dict[str, Dict[str, TestStatus]] = {}
 
         tasks = [
             self.fetch_impl_test_statuses(
@@ -198,7 +252,7 @@ class Client(BaseModel):
 
         impl_results = await asyncio.gather(*tasks)
 
-        for impl, statuses in zip(function.zimplementations, impl_results):
-            result[impl.zid] = statuses
-
-        return result
+        return {
+            impl.zid: statuses
+            for impl, statuses in zip(function.zimplementations, impl_results)
+        }
